@@ -1,11 +1,13 @@
+import matplotlib.font_manager
 from main import encode, decode
 import random
 import matplotlib.pyplot as plt
+import matplotlib
 from modelscope import AutoModelForCausalLM, AutoTokenizer
 from dotenv import load_dotenv
 import os
 
-BYTE_SIZE = 100
+BYTE_SIZE = 200
 BITS_PER_NUMBER = 4
 
 load_dotenv()
@@ -42,10 +44,11 @@ def main():
         error_rates.append(error_rate)
         lengths.append(i//segment_size)
 
+    zhfont=matplotlib.font_manager.FontProperties(fname="SourceHanSansCN-Regular.otf")
     plt.plot(lengths, error_rates, marker='o')
-    plt.xlabel('Data Length')
-    plt.ylabel('Error Rate')
-    plt.title('Error Rate vs Data Length')
+    plt.xlabel('数据长度（字节）', fontproperties=zhfont)
+    plt.ylabel('误码率', fontproperties=zhfont)
+    plt.title('误码率与数据长度', fontproperties=zhfont)
     plt.grid(True)
     plt.show()
 
