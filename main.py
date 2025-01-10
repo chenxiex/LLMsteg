@@ -7,16 +7,7 @@ import os
 # 加载.env文件中的环境变量
 load_dotenv()
 
-def encode(a, k, prompt):
-    model_name = os.getenv("MODEL_DIR", "./model-dir")
-
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        torch_dtype="auto",
-        device_map="auto"
-    )
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-
+def encode(a, k, prompt, model, tokenizer):
     messages = [
         {"role": "system", "content": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant."},
         {"role": "user", "content": prompt},
@@ -51,16 +42,7 @@ def encode(a, k, prompt):
     response = tokenizer.decode(generated_ids, skip_special_tokens=True)
     return response
 
-def decode(response, prompt):
-    model_name = os.getenv("MODEL_DIR", "./model-dir")
-
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        torch_dtype="auto",
-        device_map="auto"
-    )
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-
+def decode(response, prompt, model, tokenizer):
     messages = [
         {"role": "system", "content": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant."},
         {"role": "user", "content": prompt},
@@ -96,6 +78,15 @@ def main():
     parser.add_argument('--output', type=str, default="output.txt", required=True, help='File path to write output')
     args = parser.parse_args()
 
+    model_name = os.getenv("MODEL_DIR", "./model-dir")
+
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        torch_dtype="auto",
+        device_map="auto"
+    )
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+
     with open(args.prompt, 'r', errors='ignore') as f:
         prompt = f.read().strip()
 
@@ -109,13 +100,13 @@ def main():
                     bits += '0' * (args.k - len(bits) % args.k)
                 for i in range(0, len(bits), args.k):
                     a.append(int(bits[i:i+args.k], 2))
-        response = encode(a, args.k, prompt)
+        response = encode(a, args.k, prompt, model, tokenizer)
         with open(args.output, 'w', errors='ignore') as f:
             f.write(response)
     elif args.encode_decode == 1:
         with open(args.cover, 'r', errors='ignore') as f:
             response = f.read().strip()
-        a1 = decode(response, prompt)
+        a1 = decode(response, prompt, model, tokenizer)
         bits = ''.join(format(x, f'0{args.k}b') for x in a1)
             # 确保bits的长度是8的倍数，不足部分用0填充
         padded_bits = bits.ljust((len(bits) + 7) // 8 * 8, '0')
