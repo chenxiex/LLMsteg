@@ -23,21 +23,22 @@ def encode(a, k, prompt, model, tokenizer):
     input_ids = model_inputs.input_ids
     end_tokens = {tokenizer.convert_tokens_to_ids(token) for token in [".", "?", "!"]}
 
-    for i in range(len(a)):
-        outputs = model(input_ids=input_ids, temperature=0)
-        logits = outputs.logits[:, -1, :]
-        sorted_logits, sorted_indices = torch.sort(logits, descending=True)
-        next_token_id = sorted_indices[0, a[i]].unsqueeze(0)
-        input_ids = torch.cat([input_ids, next_token_id.unsqueeze(0)], dim=-1)
-        generated_ids.append(next_token_id.item())
+    with torch.no_grad():
+        for i in range(len(a)):
+            outputs = model(input_ids=input_ids, temperature=0)
+            logits = outputs.logits[:, -1, :]
+            sorted_logits, sorted_indices = torch.sort(logits, descending=True)
+            next_token_id = sorted_indices[0, a[i]].unsqueeze(0)
+            input_ids = torch.cat([input_ids, next_token_id.unsqueeze(0)], dim=-1)
+            generated_ids.append(next_token_id.item())
 
-    while generated_ids[-1] not in end_tokens:
-        outputs = model(input_ids=input_ids, temperature=0)
-        logits = outputs.logits[:, -1, :]
-        sorted_logits, sorted_indices = torch.sort(logits, descending=True)
-        next_token_id = sorted_indices[0, 0].unsqueeze(0)
-        input_ids = torch.cat([input_ids, next_token_id.unsqueeze(0)], dim=-1)
-        generated_ids.append(next_token_id.item())
+        while generated_ids[-1] not in end_tokens:
+            outputs = model(input_ids=input_ids, temperature=0)
+            logits = outputs.logits[:, -1, :]
+            sorted_logits, sorted_indices = torch.sort(logits, descending=True)
+            next_token_id = sorted_indices[0, 0].unsqueeze(0)
+            input_ids = torch.cat([input_ids, next_token_id.unsqueeze(0)], dim=-1)
+            generated_ids.append(next_token_id.item())
 
     response = tokenizer.decode(generated_ids, skip_special_tokens=True)
     return response
@@ -57,14 +58,14 @@ def decode(response, prompt, model, tokenizer):
     tokens = tokenizer(response, return_tensors="pt").input_ids[0].to(model.device)
     a1 = []
     input_ids = model_inputs.input_ids
-
-    for token in tokens:
-        outputs = model(input_ids=input_ids, temperature=0)
-        logits = outputs.logits[:, -1, :]
-        sorted_logits, sorted_indices = torch.sort(logits, descending=True)
-        token_index = (sorted_indices == token).nonzero(as_tuple=True)[1].item()
-        a1.append(token_index)
-        input_ids = torch.cat([input_ids, token.view(1, 1)], dim=-1)
+    with torch.no_grad():
+        for token in tokens:
+            outputs = model(input_ids=input_ids, temperature=0)
+            logits = outputs.logits[:, -1, :]
+            sorted_logits, sorted_indices = torch.sort(logits, descending=True)
+            token_index = (sorted_indices == token).nonzero(as_tuple=True)[1].item()
+            a1.append(token_index)
+            input_ids = torch.cat([input_ids, token.view(1, 1)], dim=-1)
 
     return a1
 
