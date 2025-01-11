@@ -19,7 +19,7 @@ def calculate_error_rate(original, received, k):
     return errors / len(original_bits)
 
 def main():
-    model_name = os.getenv("MODEL_DIR", "./model-dir")
+    model_name = os.getenv("MODEL_DIR", "Qwen/Qwen2.5-3B-Instruct")
 
     model = AutoModelForCausalLM.from_pretrained(
         model_name,

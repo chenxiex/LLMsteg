@@ -79,7 +79,7 @@ def main():
     parser.add_argument('--output', type=str, default="output.txt", required=True, help='File path to write output')
     args = parser.parse_args()
 
-    model_name = os.getenv("MODEL_DIR", "./model-dir")
+    model_name = os.getenv("MODEL_DIR", "Qwen/Qwen2.5-3B-Instruct")
 
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
