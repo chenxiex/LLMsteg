@@ -25,7 +25,7 @@ def encode(a, k, prompt, model, tokenizer):
 
     with torch.no_grad():
         for i in range(len(a)):
-            outputs = model(input_ids=input_ids, temperature=0)
+            outputs = model(input_ids=input_ids)
             logits = outputs.logits[:, -1, :]
             sorted_logits, sorted_indices = torch.sort(logits, descending=True)
             next_token_id = sorted_indices[0, a[i]].unsqueeze(0)
@@ -33,7 +33,7 @@ def encode(a, k, prompt, model, tokenizer):
             generated_ids.append(next_token_id.item())
 
         while generated_ids[-1] not in end_tokens:
-            outputs = model(input_ids=input_ids, temperature=0)
+            outputs = model(input_ids=input_ids)
             logits = outputs.logits[:, -1, :]
             sorted_logits, sorted_indices = torch.sort(logits, descending=True)
             next_token_id = sorted_indices[0, 0].unsqueeze(0)
@@ -60,7 +60,7 @@ def decode(response, prompt, model, tokenizer):
     input_ids = model_inputs.input_ids
     with torch.no_grad():
         for token in tokens:
-            outputs = model(input_ids=input_ids, temperature=0)
+            outputs = model(input_ids=input_ids)
             logits = outputs.logits[:, -1, :]
             sorted_logits, sorted_indices = torch.sort(logits, descending=True)
             token_index = (sorted_indices == token).nonzero(as_tuple=True)[1].item()
