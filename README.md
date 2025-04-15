@@ -5,8 +5,9 @@
 1. 安装依赖
 
     ```shell
-    conda create --name llmsteg --file requirements.txt
+    conda create --name llmsteg
     conda activate llmsteg
+    pip install -r requirements.txt
     ```
 2. 配置环境变量
 
