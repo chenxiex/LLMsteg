@@ -5,7 +5,7 @@
 1. 安装依赖
 
     ```shell
-    conda create --name llmsteg
+    conda create --name llmsteg python=3.11
     conda activate llmsteg
     pip install -r requirements.txt
     ```
