@@ -1,4 +1,4 @@
-from modelscope import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 import argparse
 from dotenv import load_dotenv
@@ -7,9 +7,27 @@ import os
 # 加载.env文件中的环境变量
 load_dotenv()
 
-def encode(a, k, prompt, model, tokenizer):
+model_name = os.getenv("MODEL_DIR", "Qwen/Qwen2.5-3B-Instruct")
+
+model=None
+tokenizer=None
+
+def load_model():
+    global model, tokenizer
+    if model is not None and tokenizer is not None:
+        return
+    # 加载模型和分词器
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        torch_dtype="auto",
+        device_map="auto"
+    )
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+def encode(a, prompt):
+    load_model()
     messages = [
-        {"role": "system", "content": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant."},
+        {"role": "system", "content": "You are a forum user. The input consists of a post and its replies. Based on the information provided, compose a new reply that contributes meaningfully to the discussion. Your response should be natural, relevant, and written in the tone of an engaged forum participant. Feel free to reference or build upon previous replies where appropriate."},
         {"role": "user", "content": prompt},
     ]
     text = tokenizer.apply_chat_template(
@@ -43,7 +61,8 @@ def encode(a, k, prompt, model, tokenizer):
     response = tokenizer.decode(generated_ids, skip_special_tokens=True)
     return response
 
-def decode(response, prompt, model, tokenizer):
+def decode(response, prompt):
+    load_model()
     messages = [
         {"role": "system", "content": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant."},
         {"role": "user", "content": prompt},
@@ -79,15 +98,6 @@ def main():
     parser.add_argument('--output', type=str, default="output.txt", required=True, help='File path to write output')
     args = parser.parse_args()
 
-    model_name = os.getenv("MODEL_DIR", "Qwen/Qwen2.5-3B-Instruct")
-
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name,
-        torch_dtype="auto",
-        device_map="auto"
-    )
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-
     with open(args.prompt, 'r', errors='ignore') as f:
         prompt = f.read().strip()
 
@@ -101,13 +111,13 @@ def main():
                     bits += '0' * (args.k - len(bits) % args.k)
                 for i in range(0, len(bits), args.k):
                     a.append(int(bits[i:i+args.k], 2))
-        response = encode(a, args.k, prompt, model, tokenizer)
+        response = encode(a, args.k, prompt)
         with open(args.output, 'w', errors='ignore') as f:
             f.write(response)
     elif args.encode_decode == 1:
         with open(args.cover, 'r', errors='ignore') as f:
             response = f.read().strip()
-        a1 = decode(response, prompt, model, tokenizer)
+        a1 = decode(response, prompt)
         bits = ''.join(format(x, f'0{args.k}b') for x in a1)
             # 确保bits的长度是8的倍数，不足部分用0填充
         padded_bits = bits.ljust((len(bits) + 7) // 8 * 8, '0')

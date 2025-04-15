@@ -27,6 +27,3 @@ options:
   --cover COVER         File path to read response, used when --encode_decode=1
   --output OUTPUT       File path to write output
 ```
-
-## 3. 其它文件说明
-1. `length_and_misrate.py`: 该文件调用隐写算法以测试隐写数据长度和误码率之间的关系。
