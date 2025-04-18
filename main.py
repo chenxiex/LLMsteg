@@ -88,6 +88,39 @@ def decode(response, prompt):
 
     return a1
 
+def encode_file(prompt, secret, output, k=2):
+    with open(prompt, 'r') as f:
+        prompt = f.read().strip()
+    a = []
+    if secret is not None:
+        with open(secret, 'rb') as f:
+            secret_data = f.read()
+            bits = ''.join(format(byte, '08b') for byte in secret_data)
+            if len(bits) % k != 0:
+                bits += '0' * (k - len(bits) % k)
+            for i in range(0, len(bits), k):
+                a.append(int(bits[i:i+k], 2))
+    response = encode(a, prompt)
+    with open(output, 'w', errors='ignore') as f:
+        f.write(response)
+
+def decode_file(prompt, cover, output, k=2):
+    with open(prompt, 'r') as f:
+        prompt = f.read().strip()
+    with open(cover, 'r') as f:
+        response = f.read().strip()
+    a1 = decode(response, prompt)
+    bits = ''.join(format(x, f'0{k}b') for x in a1)
+        # 确保bits的长度是8的倍数，不足部分用0填充
+    padded_bits = bits.ljust((len(bits) + 7) // 8 * 8, '0')
+
+    # 将二进制字符串按字节分组并转换为字节
+    byte_array = bytearray(int(padded_bits[i:i+8], 2) for i in range(0, len(padded_bits), 8))
+
+    # 将字节写入文件
+    with open(output, 'wb') as binary_file:
+        binary_file.write(byte_array)
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--encode_decode', type=int, choices=[0, 1], required=True, help='0 for encode, 1 for decode')
@@ -98,36 +131,10 @@ def main():
     parser.add_argument('--output', type=str, default="output.txt", required=True, help='File path to write output')
     args = parser.parse_args()
 
-    with open(args.prompt, 'r', errors='ignore') as f:
-        prompt = f.read().strip()
-
     if args.encode_decode == 0:
-        a = []
-        if args.secret:
-            with open(args.secret, 'rb') as f:
-                secret_data = f.read()
-                bits = ''.join(format(byte, '08b') for byte in secret_data)
-                if len(bits) % args.k != 0:
-                    bits += '0' * (args.k - len(bits) % args.k)
-                for i in range(0, len(bits), args.k):
-                    a.append(int(bits[i:i+args.k], 2))
-        response = encode(a, args.k, prompt)
-        with open(args.output, 'w', errors='ignore') as f:
-            f.write(response)
+        encode_file(args.prompt, args.secret, args.output, args.k)
     elif args.encode_decode == 1:
-        with open(args.cover, 'r', errors='ignore') as f:
-            response = f.read().strip()
-        a1 = decode(response, prompt)
-        bits = ''.join(format(x, f'0{args.k}b') for x in a1)
-            # 确保bits的长度是8的倍数，不足部分用0填充
-        padded_bits = bits.ljust((len(bits) + 7) // 8 * 8, '0')
-
-        # 将二进制字符串按字节分组并转换为字节
-        byte_array = bytearray(int(padded_bits[i:i+8], 2) for i in range(0, len(padded_bits), 8))
-
-        # 将字节写入文件
-        with open(args.output, 'wb') as binary_file:
-            binary_file.write(byte_array)
+        decode_file(args.prompt, args.cover, args.output, args.k)
 
 if __name__ == "__main__":
     main()

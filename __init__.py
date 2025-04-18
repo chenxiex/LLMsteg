@@ -1,1 +1,1 @@
-from main import encode, decode
+from .main import encode, decode, encode_file, decode_file
