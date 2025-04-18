@@ -88,7 +88,7 @@ def decode(response, prompt):
 
     return a1
 
-def encode_file(prompt, secret, output, k=2):
+def encode_file(prompt, secret, output, k=4):
     with open(prompt, 'r') as f:
         prompt = f.read().strip()
     a = []
@@ -104,7 +104,7 @@ def encode_file(prompt, secret, output, k=2):
     with open(output, 'w', errors='ignore') as f:
         f.write(response)
 
-def decode_file(prompt, cover, output, k=2):
+def decode_file(prompt, cover, output, k=4):
     with open(prompt, 'r') as f:
         prompt = f.read().strip()
     with open(cover, 'r') as f:
@@ -124,7 +124,7 @@ def decode_file(prompt, cover, output, k=2):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--encode_decode', type=int, choices=[0, 1], required=True, help='0 for encode, 1 for decode')
-    parser.add_argument('--k', type=int, default=2, help='Value of k')
+    parser.add_argument('--k', type=int, default=4, help='Value of k')
     parser.add_argument('--prompt', type=str, required=True, help='File path to read prompt')
     parser.add_argument('--secret', type=str, help='File path to read secret data, used when --encode_decode=0')
     parser.add_argument('--cover', type=str, help='File path to read response, used when --encode_decode=1')
