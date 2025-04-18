@@ -64,7 +64,7 @@ def encode(a, prompt):
 def decode(response, prompt):
     load_model()
     messages = [
-        {"role": "system", "content": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant."},
+        {"role": "system", "content": "You are a forum user. The input consists of a post and its replies. Based on the information provided, compose a new reply that contributes meaningfully to the discussion. Your response should be natural, relevant, and written in the tone of an engaged forum participant. Feel free to reference or build upon previous replies where appropriate."},
         {"role": "user", "content": prompt},
     ]
     text = tokenizer.apply_chat_template(
