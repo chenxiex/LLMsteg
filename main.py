@@ -1,45 +1,61 @@
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer # type: ignore
+from transformers import BitsAndBytesConfig # type: ignore
 import torch
 import argparse
 from dotenv import load_dotenv
 import os
+import re
 
 # 加载.env文件中的环境变量
 load_dotenv()
 
-model_name = os.getenv("MODEL_DIR", "Qwen/Qwen2.5-3B-Instruct")
+model_name = os.getenv("MODEL_DIR", "Qwen/Qwen3-4B")
 
-model=None
-tokenizer=None
+system_message = "You are a forum user. The input consists of a post and its replies. Based on the information provided, compose a new reply that contributes meaningfully to the discussion. Your response should be natural, relevant, and written in the tone of an engaged forum participant. Feel free to reference or build upon previous replies where appropriate."
 
-def load_model():
-    global model, tokenizer
-    if model is not None and tokenizer is not None:
-        return
+def load_model(model_name=model_name, load_in_4bit=False):
     # 加载模型和分词器
+    quantization_config = None
+    if load_in_4bit:
+        quantization_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_compute_dtype=torch.bfloat16,
+        )
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype="auto",
-        device_map="auto"
+        device_map="auto",
+        quantization_config=quantization_config,
     )
     tokenizer = AutoTokenizer.from_pretrained(model_name)
+    return model, tokenizer
 
-def encode(a, prompt):
-    load_model()
+def encode(a, prompt, model=None, tokenizer=None):
+    if model is None or tokenizer is None:
+        model, tokenizer = load_model()
+    assert model is not None, "Model is not loaded."
+    assert tokenizer is not None, "Tokenizer is not loaded."
     messages = [
-        {"role": "system", "content": "You are a forum user. The input consists of a post and its replies. Based on the information provided, compose a new reply that contributes meaningfully to the discussion. Your response should be natural, relevant, and written in the tone of an engaged forum participant. Feel free to reference or build upon previous replies where appropriate."},
+        {"role": "system", "content": system_message},
         {"role": "user", "content": prompt},
     ]
     text = tokenizer.apply_chat_template(
         messages,
         tokenize=False,
         add_generation_prompt=True,
+        enable_thinking=False,
     )
     model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
 
     generated_ids = []
     input_ids = model_inputs.input_ids
     end_tokens = {tokenizer.convert_tokens_to_ids(token) for token in [".", "?", "!"]}
+    # 添加EOS token到end_tokens集合
+    eos_token_id = tokenizer.eos_token_id
+    if eos_token_id is not None:
+        end_tokens.add(eos_token_id)
 
     with torch.no_grad():
         for i in range(len(a)):
@@ -50,7 +66,7 @@ def encode(a, prompt):
             input_ids = torch.cat([input_ids, next_token_id.unsqueeze(0)], dim=-1)
             generated_ids.append(next_token_id.item())
 
-        while generated_ids[-1] not in end_tokens:
+        while generated_ids[-1] not in end_tokens and len(generated_ids) < 1000:
             outputs = model(input_ids=input_ids)
             logits = outputs.logits[:, -1, :]
             sorted_logits, sorted_indices = torch.sort(logits, descending=True)
@@ -61,16 +77,20 @@ def encode(a, prompt):
     response = tokenizer.decode(generated_ids, skip_special_tokens=True)
     return response
 
-def decode(response, prompt):
-    load_model()
+def decode(response, prompt, model=None, tokenizer=None):
+    if model is None or tokenizer is None:
+        model, tokenizer = load_model()
+    assert model is not None, "Model is not loaded."
+    assert tokenizer is not None, "Tokenizer is not loaded."
     messages = [
-        {"role": "system", "content": "You are a forum user. The input consists of a post and its replies. Based on the information provided, compose a new reply that contributes meaningfully to the discussion. Your response should be natural, relevant, and written in the tone of an engaged forum participant. Feel free to reference or build upon previous replies where appropriate."},
+        {"role": "system", "content": system_message},
         {"role": "user", "content": prompt},
     ]
     text = tokenizer.apply_chat_template(
         messages,
         tokenize=False,
         add_generation_prompt=True,
+        enable_thinking=False,
     )
     model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
 
