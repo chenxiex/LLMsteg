@@ -1,1 +1,1 @@
-from .main import encode, decode, encode_file, decode_file
+from LLMsteg.main import encode, decode, encode_file, decode_file, load_model
