@@ -1,51 +1,84 @@
-from transformers import GPT2LMHeadModel, GPT2TokenizerFast
+from dotenv import load_dotenv
+load_dotenv()
+from transformers import GPT2LMHeadModel, GPT2TokenizerFast # type: ignore
 from accelerate.test_utils.testing import get_backend
-
-device, _, _ = get_backend() # automatically detects the underlying device type (CUDA, CPU, XPU, MPS, etc.)
-model_id = "openai-community/gpt2-large"
-model = GPT2LMHeadModel.from_pretrained(model_id).to(device)
-tokenizer = GPT2TokenizerFast.from_pretrained(model_id)
-
-from twitter_nlp_gen import generate
-test=generate()
-encodings = tokenizer("\n\n".join(test), return_tensors="pt")
-
 import torch
 from tqdm import tqdm
+from twitter_nlp_gen import generate
+import matplotlib.pyplot as plt
+import matplotlib.font_manager
 
-max_length = model.config.n_positions
-stride = 512
-seq_len = encodings.input_ids.size(1)
+def load_model():
+    device, _, _ = get_backend() # automatically detects the underlying device type (CUDA, CPU, XPU, MPS, etc.)
+    model_id = "openai-community/gpt2-large"
+    model = GPT2LMHeadModel.from_pretrained(model_id).to(device) # type: ignore
+    tokenizer = GPT2TokenizerFast.from_pretrained(model_id)
+    return model, tokenizer, device
 
-nll_sum = 0.0
-n_tokens = 0
-prev_end_loc = 0
-for begin_loc in tqdm(range(0, seq_len, stride)):
-    end_loc = min(begin_loc + max_length, seq_len)
-    trg_len = end_loc - prev_end_loc  # may be different from stride on last loop
-    input_ids = encodings.input_ids[:, begin_loc:end_loc].to(device)
-    target_ids = input_ids.clone()
-    target_ids[:, :-trg_len] = -100
+def calc_ppl(test, model=None, tokenizer=None, device=None):
+    if model is None or tokenizer is None or device is None:
+        model, tokenizer, device = load_model()
 
-    with torch.no_grad():
-        outputs = model(input_ids, labels=target_ids)
+    encodings = tokenizer("\n\n".join(test), return_tensors="pt")
 
-        # loss is calculated using CrossEntropyLoss which averages over valid labels
-        # N.B. the model only calculates loss over trg_len - 1 labels, because it internally shifts the labels
-        # to the left by 1.
-        neg_log_likelihood = outputs.loss
+    max_length = model.config.n_positions
+    stride = 512
+    seq_len = encodings.input_ids.size(1)
 
-    # Accumulate the total negative log-likelihood and the total number of tokens
-    num_valid_tokens = (target_ids != -100).sum().item()  # number of valid tokens in target_ids
-    batch_size = target_ids.size(0)
-    num_loss_tokens = num_valid_tokens - batch_size  # subtract batch_size due to internal label shift
-    nll_sum += neg_log_likelihood * num_loss_tokens
-    n_tokens += num_loss_tokens
+    nll_sum = 0.0
+    n_tokens = 0
+    prev_end_loc = 0
+    for begin_loc in tqdm(range(0, seq_len, stride)):
+        end_loc = min(begin_loc + max_length, seq_len)
+        trg_len = end_loc - prev_end_loc  # may be different from stride on last loop
+        input_ids = encodings.input_ids[:, begin_loc:end_loc].to(device)
+        target_ids = input_ids.clone()
+        target_ids[:, :-trg_len] = -100
 
-    prev_end_loc = end_loc
-    if end_loc == seq_len:
-        break
+        with torch.no_grad():
+            outputs = model(input_ids, labels=target_ids)
 
-avg_nll = nll_sum / n_tokens  # average negative log-likelihood per token
-ppl = torch.exp(avg_nll)
-print(ppl)
+            # loss is calculated using CrossEntropyLoss which averages over valid labels
+            # N.B. the model only calculates loss over trg_len - 1 labels, because it internally shifts the labels
+            # to the left by 1.
+            neg_log_likelihood = outputs.loss
+
+        # Accumulate the total negative log-likelihood and the total number of tokens
+        num_valid_tokens = (target_ids != -100).sum().item()  # number of valid tokens in target_ids
+        batch_size = target_ids.size(0)
+        num_loss_tokens = num_valid_tokens - batch_size  # subtract batch_size due to internal label shift
+        nll_sum += neg_log_likelihood * num_loss_tokens
+        n_tokens += num_loss_tokens
+
+        prev_end_loc = end_loc
+        if end_loc == seq_len:
+            break
+
+    avg_nll = nll_sum / n_tokens  # average negative log-likelihood per token
+    if not isinstance(avg_nll, torch.Tensor):
+        avg_nll = torch.tensor(avg_nll, device=device)
+    ppl = torch.exp(avg_nll)
+    return ppl
+
+def main():
+    #model_names = ["01-ai/Yi-1.5-6B-Chat", "Qwen/Qwen2.5-3B-Instruct", "Qwen/Qwen3-4B", "microsoft/Phi-4-mini-instruct",]
+    model, tokenizer, device = load_model()
+    byte_sizes = [i for i in range(10, 101, 10)]
+    results = []
+    for byte_size in byte_sizes:
+        test=generate("Qwen/Qwen3-4B", byte_size)
+        ppl = calc_ppl(test, model, tokenizer, device)
+        results.append(ppl.item())
+    
+    plt.figure()
+    zhfont = matplotlib.font_manager.FontProperties(fname="LLMsteg/SourceHanSansCN-Regular.otf")
+    plt.plot(byte_sizes, results, marker='o')
+    plt.xlabel('数据长度（字节）', fontproperties=zhfont)
+    plt.ylabel('困惑度', fontproperties=zhfont)
+    plt.title('困惑度与数据长度', fontproperties=zhfont)
+    plt.grid(True)
+    plt.savefig("cache/ppl_gpt2.png", dpi=300, bbox_inches='tight')
+    plt.close()  # 关闭当前图形
+
+if __name__ == "__main__":
+    main()
