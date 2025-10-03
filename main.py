@@ -9,9 +9,9 @@ import re
 # 加载.env文件中的环境变量
 load_dotenv()
 
-model_name = os.getenv("MODEL_DIR", "Qwen/Qwen3-4B")
+model_name = os.getenv("MODEL_DIR", "Qwen/Qwen3-4B-Instruct-2507")
 
-system_message = "You are a forum user. The input consists of a post and its replies. Based on the information provided, compose a new reply that contributes meaningfully to the discussion. Your response should be natural, relevant, and written in the tone of an engaged forum participant. Feel free to reference or build upon previous replies where appropriate."
+system_message = "You are a forum user. The input consists of a post and its replies. Based on the information provided, compose a new reply that contributes meaningfully to the discussion. You must only use English. Do not use emoji unless absolutely necessary."
 
 def load_model(model_name=model_name, load_in_4bit=False):
     # 加载模型和分词器
